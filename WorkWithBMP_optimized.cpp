@@ -8,6 +8,7 @@
 #include "WorkWithBMP_optimized.h"
 #include <iostream>
 #include <cstring>
+#include <iomanip>
 #include <numeric>
 
 BMPImageOptimized::BMPImageOptimized() 
