@@ -1,0 +1,122 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        include:
+          - compiler: gcc
+            cxx: g++
+          - compiler: clang
+            cxx: clang++
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup build environment
+      run: |
+        echo "Setting up build environment for Ubuntu with ${{ matrix.compiler }}"
+        sudo apt-get update
+        sudo apt-get install -y build-essential libomp-dev
+
+    - name: Build project
+      run: |
+        make clean
+        make CXX=${{ matrix.cxx }} all
+
+    - name: Run basic functionality test
+      run: |
+        ./bmp_processor --help
+        ./bmp_processor example.bmp
+        ./bmp_processor -p -t 4 example.bmp
+
+    - name: Run benchmark
+      run: |
+        ./bmp_processor --benchmark
+
+    - name: Check for memory leaks
+      run: |
+        sudo apt-get install -y valgrind
+        make memcheck
+
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libomp-dev
+
+    - name: Build optimized version
+      run: |
+        make clean
+        make release
+
+    - name: Run performance benchmarks
+      run: |
+        echo "Running performance benchmarks..."
+        ./bmp_processor --benchmark > benchmark_results.txt
+        cat benchmark_results.txt
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: benchmark_results.txt
+
+  build-optimized:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential libomp-dev
+
+    - name: Build optimized version
+      run: |
+        make clean
+        make build-all
+
+    - name: Test optimized version
+      run: |
+        ./bmp_processor_optimized --help
+        ./bmp_processor_optimized example.bmp
+        ./bmp_processor_optimized -p -t 4 example.bmp
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run security scan
+      run: |
+        # Install security scanning tools
+        sudo apt-get update
+        sudo apt-get install -y cppcheck clang-tools
+        
+        # Run static analysis
+        cppcheck --enable=all --inconclusive --std=c++17 main.cpp WorkWithBMP.cpp
+        
+        # Run clang-tidy
+        clang-tidy main.cpp WorkWithBMP.cpp -- -std=c++17 -I.

@@ -307,3 +307,247 @@ void BMPImage::applyGaussianFilter(std::vector<unsigned char>& imageData) {
 size_t BMPImage::calculateMemoryUsage() const {
     return sizeof(*this) + dataSize;
 }
+
+// Parallel processing implementations
+
+void BMPImage::rotateClockwiseParallel(std::vector<unsigned char>& imageData, int numThreads) {
+    if (imageData.size() != static_cast<size_t>(dataSize)) {
+        throw std::runtime_error("Image data size mismatch for rotation");
+    }
+    
+    int bytesPerPixel = bitsPerPixel / 8;
+    int oldWidth = width;
+    int oldHeight = height;
+    int oldRowSize = rowSize;
+    
+    // Update dimensions first
+    std::swap(width, height);
+    rowSize = calculateRowSize(width, bitsPerPixel);
+    dataSize = rowSize * height;
+    
+    // Create new data with proper padding
+    std::vector<unsigned char> newData(dataSize, 0);
+    
+    // Determine number of threads
+    if (numThreads <= 0) {
+        numThreads = std::thread::hardware_concurrency();
+        if (numThreads == 0) numThreads = 4; // fallback
+    }
+    
+#ifdef _OPENMP
+    #pragma omp parallel for num_threads(numThreads) collapse(2)
+    for (int y = 0; y < oldHeight; ++y) {
+        for (int x = 0; x < oldWidth; ++x) {
+            for (int c = 0; c < bytesPerPixel; ++c) {
+                // Clockwise rotation: (x, y) -> (y, oldWidth - 1 - x)
+                int newX = y;
+                int newY = oldWidth - 1 - x;
+                if (newX < width && newY < height) {
+                    newData[newY * rowSize + newX * bytesPerPixel + c] = 
+                        imageData[y * oldRowSize + x * bytesPerPixel + c];
+                }
+            }
+        }
+    }
+#else
+    // Fallback to std::thread if OpenMP is not available
+    std::vector<std::thread> threads;
+    int rowsPerThread = oldHeight / numThreads;
+    
+    for (int t = 0; t < numThreads; ++t) {
+        int startY = t * rowsPerThread;
+        int endY = (t == numThreads - 1) ? oldHeight : (t + 1) * rowsPerThread;
+        
+        threads.emplace_back([&, startY, endY, oldWidth, oldRowSize, bytesPerPixel]() {
+            for (int y = startY; y < endY; ++y) {
+                for (int x = 0; x < oldWidth; ++x) {
+                    for (int c = 0; c < bytesPerPixel; ++c) {
+                        int newX = y;
+                        int newY = oldWidth - 1 - x;
+                        if (newX < width && newY < height) {
+                            newData[newY * rowSize + newX * bytesPerPixel + c] = 
+                                imageData[y * oldRowSize + x * bytesPerPixel + c];
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    for (auto& thread : threads) {
+        thread.join();
+    }
+#endif
+    
+    imageData = std::move(newData);
+}
+
+void BMPImage::rotateCounterClockwiseParallel(std::vector<unsigned char>& imageData, int numThreads) {
+    if (imageData.size() != static_cast<size_t>(dataSize)) {
+        throw std::runtime_error("Image data size mismatch for rotation");
+    }
+    
+    int bytesPerPixel = bitsPerPixel / 8;
+    int oldWidth = width;
+    int oldHeight = height;
+    int oldRowSize = rowSize;
+    
+    // Update dimensions first
+    std::swap(width, height);
+    rowSize = calculateRowSize(width, bitsPerPixel);
+    dataSize = rowSize * height;
+    
+    // Create new data with proper padding
+    std::vector<unsigned char> newData(dataSize, 0);
+    
+    // Determine number of threads
+    if (numThreads <= 0) {
+        numThreads = std::thread::hardware_concurrency();
+        if (numThreads == 0) numThreads = 4; // fallback
+    }
+    
+#ifdef _OPENMP
+    #pragma omp parallel for num_threads(numThreads) collapse(2)
+    for (int y = 0; y < oldHeight; ++y) {
+        for (int x = 0; x < oldWidth; ++x) {
+            for (int c = 0; c < bytesPerPixel; ++c) {
+                // Counter-clockwise rotation: (x, y) -> (oldHeight - 1 - y, x)
+                int newX = oldHeight - 1 - y;
+                int newY = x;
+                if (newX < width && newY < height) {
+                    newData[newY * rowSize + newX * bytesPerPixel + c] = 
+                        imageData[y * oldRowSize + x * bytesPerPixel + c];
+                }
+            }
+        }
+    }
+#else
+    // Fallback to std::thread if OpenMP is not available
+    std::vector<std::thread> threads;
+    int rowsPerThread = oldHeight / numThreads;
+    
+    for (int t = 0; t < numThreads; ++t) {
+        int startY = t * rowsPerThread;
+        int endY = (t == numThreads - 1) ? oldHeight : (t + 1) * rowsPerThread;
+        
+        threads.emplace_back([&, startY, endY, oldWidth, oldRowSize, bytesPerPixel]() {
+            for (int y = startY; y < endY; ++y) {
+                for (int x = 0; x < oldWidth; ++x) {
+                    for (int c = 0; c < bytesPerPixel; ++c) {
+                        int newX = oldHeight - 1 - y;
+                        int newY = x;
+                        if (newX < width && newY < height) {
+                            newData[newY * rowSize + newX * bytesPerPixel + c] = 
+                                imageData[y * oldRowSize + x * bytesPerPixel + c];
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    for (auto& thread : threads) {
+        thread.join();
+    }
+#endif
+    
+    imageData = std::move(newData);
+}
+
+void BMPImage::applyGaussianFilterParallel(std::vector<unsigned char>& imageData, int numThreads) {
+    if (imageData.size() != static_cast<size_t>(dataSize)) {
+        throw std::runtime_error("Image data size mismatch for filtering");
+    }
+    
+    // Gaussian kernel 3x3
+    const float kernel[3][3] = {
+        {1.0f/16, 2.0f/16, 1.0f/16},
+        {2.0f/16, 4.0f/16, 2.0f/16},
+        {1.0f/16, 2.0f/16, 1.0f/16}
+    };
+    
+    int bytesPerPixel = bitsPerPixel / 8;
+    std::vector<unsigned char> filtered(dataSize);
+    
+    // Copy original data to filtered
+    std::copy(imageData.begin(), imageData.end(), filtered.begin());
+    
+    // Determine number of threads
+    if (numThreads <= 0) {
+        numThreads = std::thread::hardware_concurrency();
+        if (numThreads == 0) numThreads = 4; // fallback
+    }
+    
+#ifdef _OPENMP
+    #pragma omp parallel for num_threads(numThreads) collapse(2)
+    for (int y = 1; y < height - 1; ++y) {
+        for (int x = 1; x < width - 1; ++x) {
+            for (int c = 0; c < bytesPerPixel; ++c) {
+                float sum = 0.0f;
+                
+                for (int ky = 0; ky < 3; ++ky) {
+                    for (int kx = 0; kx < 3; ++kx) {
+                        int px = x + kx - 1;
+                        int py = y + ky - 1;
+                        sum += kernel[ky][kx] * imageData[py * rowSize + px * bytesPerPixel + c];
+                    }
+                }
+                
+                // Clamp to valid range
+                filtered[y * rowSize + x * bytesPerPixel + c] = 
+                    static_cast<unsigned char>(std::max(0.0f, std::min(255.0f, sum)));
+            }
+        }
+    }
+#else
+    // Fallback to std::thread if OpenMP is not available
+    std::vector<std::thread> threads;
+    int rowsPerThread = (height - 2) / numThreads;
+    
+    for (int t = 0; t < numThreads; ++t) {
+        int startY = 1 + t * rowsPerThread;
+        int endY = (t == numThreads - 1) ? height - 1 : 1 + (t + 1) * rowsPerThread;
+        
+        threads.emplace_back([&, startY, endY, bytesPerPixel]() {
+            for (int y = startY; y < endY; ++y) {
+                for (int x = 1; x < width - 1; ++x) {
+                    for (int c = 0; c < bytesPerPixel; ++c) {
+                        float sum = 0.0f;
+                        
+                        for (int ky = 0; ky < 3; ++ky) {
+                            for (int kx = 0; kx < 3; ++kx) {
+                                int px = x + kx - 1;
+                                int py = y + ky - 1;
+                                sum += kernel[ky][kx] * imageData[py * rowSize + px * bytesPerPixel + c];
+                            }
+                        }
+                        
+                        filtered[y * rowSize + x * bytesPerPixel + c] = 
+                            static_cast<unsigned char>(std::max(0.0f, std::min(255.0f, sum)));
+                    }
+                }
+            }
+        });
+    }
+    
+    for (auto& thread : threads) {
+        thread.join();
+    }
+#endif
+    
+    imageData = std::move(filtered);
+}
+
+void BMPImage::processImageParallel(const std::string& inputFile, int numThreads) {
+    // This method can be used for complete parallel processing pipeline
+    // Implementation would combine all parallel operations
+    // For now, it's a placeholder for future enhancement
+    (void)inputFile; // Suppress unused parameter warning
+    if (numThreads <= 0) {
+        numThreads = std::thread::hardware_concurrency();
+        if (numThreads == 0) numThreads = 4;
+    }
+    
+    std::cout << "Processing image with " << numThreads << " threads" << std::endl;
+    // Additional parallel processing logic can be added here
+}

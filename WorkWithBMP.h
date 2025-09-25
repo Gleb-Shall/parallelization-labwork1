@@ -14,6 +14,15 @@
 #include <cmath>
 #include <algorithm>
 #include <memory>
+#include <thread>
+#include <future>
+#include <mutex>
+#include <atomic>
+#ifdef _OPENMP
+#include <omp.h>
+#elif defined(NO_OPENMP)
+// OpenMP not available, use std::thread fallback
+#endif
 
 class BMPImage {
 private:
@@ -64,6 +73,14 @@ public:
     void rotateClockwise(std::vector<unsigned char>& imageData);
     void rotateCounterClockwise(std::vector<unsigned char>& imageData);
     void applyGaussianFilter(std::vector<unsigned char>& imageData);
+    
+    // Parallel processing methods
+    void rotateClockwiseParallel(std::vector<unsigned char>& imageData, int numThreads = 0);
+    void rotateCounterClockwiseParallel(std::vector<unsigned char>& imageData, int numThreads = 0);
+    void applyGaussianFilterParallel(std::vector<unsigned char>& imageData, int numThreads = 0);
+    
+    // Thread pool methods
+    void processImageParallel(const std::string& inputFile, int numThreads = 0);
     
     // Getters
     int getWidth() const { return width; }

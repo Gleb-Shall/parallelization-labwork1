@@ -7,20 +7,53 @@ PROJECT = bmp_processor
 
 # Compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -g
-LDFLAGS = 
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2 -g -pthread
+LDFLAGS = -pthread
+
+# Parallel build support
+MAKEFLAGS += -j$(shell nproc 2>/dev/null || echo 4)
+
+# OpenMP support (check if compiler supports it)
+OPENMP_FLAGS = -fopenmp
+ifeq ($(shell $(CXX) -fopenmp -x c++ -c /dev/null -o /dev/null 2>/dev/null; echo $$?),0)
+    CXXFLAGS += $(OPENMP_FLAGS)
+    LDFLAGS += $(OPENMP_FLAGS)
+else
+    CXXFLAGS += -DNO_OPENMP
+endif 
 
 # Source files
 SOURCES = main.cpp WorkWithBMP.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
 
+# Optimized source files
+OPTIMIZED_SOURCES = main_optimized.cpp WorkWithBMP_optimized.cpp
+OPTIMIZED_OBJECTS = $(OPTIMIZED_SOURCES:.cpp=.o)
+OPTIMIZED_TARGET = bmp_processor_optimized
+
+# Test files removed
+
 # Default target - clean and build
-all: clean $(PROJECT)
+all: clean-all $(PROJECT)
+
+# Clean all object files before building
+clean-all:
+	rm -f main.o WorkWithBMP.o main_optimized.o WorkWithBMP_optimized.o bmp_processor bmp_processor_optimized *.o *.exe *.dSYM
+	@echo "Clean completed!"
 
 # Build executable
 $(PROJECT): $(OBJECTS)
 	$(CXX) $(OBJECTS) -o $(PROJECT) $(LDFLAGS)
+	@rm -f $(OBJECTS)
 	@echo "Build completed successfully!"
+
+# Build optimized executable
+$(OPTIMIZED_TARGET): $(OPTIMIZED_OBJECTS)
+	$(CXX) $(OPTIMIZED_OBJECTS) -o $(OPTIMIZED_TARGET) $(LDFLAGS)
+	@rm -f $(OPTIMIZED_OBJECTS)
+	@echo "Optimized build completed successfully!"
+
+# Test executable removed
 
 # Compile object files
 %.o: %.cpp
@@ -64,6 +97,19 @@ memcheck: $(PROJECT)
 install-deps:
 	@echo "No external dependencies required for this project"
 
+# Test targets removed
+
+# Benchmark targets
+benchmark: $(PROJECT)
+	./$(PROJECT) --benchmark
+
+benchmark-optimized: $(OPTIMIZED_TARGET)
+	./$(OPTIMIZED_TARGET) --advanced
+
+# Build both versions
+build-all: clean-all $(PROJECT) $(OPTIMIZED_TARGET)
+	@echo "Both versions built successfully!"
+
 # Help target
 help:
 	@echo "Available targets:"
@@ -75,8 +121,11 @@ help:
 	@echo "  rebuild    - Quick clean and rebuild"
 	@echo "  debug      - Clean and build with debug symbols"
 	@echo "  release    - Clean and build optimized release version"
+	@echo "  benchmark  - Run performance benchmarks"
+	@echo "  benchmark-optimized - Run advanced scaling benchmarks"
+	@echo "  build-all  - Build both standard and optimized versions"
 	@echo "  memcheck   - Run with valgrind memory checking"
 	@echo "  help       - Show this help message"
 
 # Phony targets
-.PHONY: all clean distclean run build-run rebuild debug release memcheck install-deps help
+.PHONY: all clean distclean run build-run rebuild debug release benchmark benchmark-optimized build-all memcheck install-deps help
