@@ -1,115 +1,65 @@
-# BMP Image Processing with Parallelization
+## Parallelization LabWork1
 
-Проект для обработки BMP изображений с поддержкой распараллеливания вычислений. Включает поворот изображений и применение фильтра Гаусса с использованием OpenMP и std::thread.
+Shikunov Gleb Aleksandrovich, 24.B81-mm
 
-## Возможности
+# Contacts
+st128274@student.spbu.ru
 
-- **Обработка BMP изображений**: загрузка, сохранение, поворот по часовой и против часовой стрелки
-- **Фильтр Гаусса**: сглаживание изображений с помощью 3x3 ядра
-- **Распараллеливание**: поддержка OpenMP и std::thread для ускорения вычислений
-- **CI/CD**: автоматическая сборка и тестирование на Ubuntu
-- **Бенчмарки**: измерение производительности с разным количеством потоков
+## Description
+Parallelization LabWork1
 
-## Требования
+## Build
 
-- C++17 компилятор (GCC, Clang)
-- OpenMP (опционально, для лучшей производительности)
-- Make или CMake
-
-## Сборка
-
-### С помощью Make
-
+### Standard Version
 ```bash
-# Обычная сборка
-make
-
-# Сборка с OpenMP
-make CXXFLAGS="-std=c++17 -Wall -Wextra -O2 -g -fopenmp"
-
-# Очистка
 make clean
+make all
 ```
 
-### С помощью CMake
-
+### Optimized Version
 ```bash
-mkdir build
-cd build
-cmake ..
-make
-
-# С OpenMP
-cmake -DENABLE_OPENMP=ON ..
-make
+make clean
+make bmp_processor_optimized
 ```
 
-## Использование
-
-### Базовое использование
-
+### Both Versions
 ```bash
-# Обработка изображения (последовательно)
+make build-all
+```
+
+## Usage
+
+### Basic Usage
+```bash
+# Standard version
 ./bmp_processor example.bmp
 
-# Параллельная обработка
-./bmp_processor -p example.bmp
-
-# Параллельная обработка с указанием количества потоков
-./bmp_processor -p -t 8 example.bmp
+# Optimized version
+./bmp_processor_optimized example.bmp
 ```
 
-### Опции командной строки
-
-- `-p, --parallel` - включить параллельную обработку
-- `-t, --threads N` - количество потоков (0 = автоматически)
-- `-b, --benchmark` - запустить бенчмарк производительности
-- `-h, --help` - показать справку
-
-### Примеры
-
+### Parallel Processing
 ```bash
-# Бенчмарк производительности
-./bmp_processor --benchmark
+# Automatic thread count detection
+./bmp_processor_optimized -p example.bmp
 
-# Обработка с 4 потоками
-./bmp_processor -p -t 4 Mandrill.bmp
-
-# Справка
-./bmp_processor --help
+# Specify exact thread count
+./bmp_processor_optimized -p -t 8 example.bmp
 ```
 
-## CI/CD
+### Benchmarks
+```bash
+# Basic benchmark
+./bmp_processor_optimized --benchmark
 
-Проект настроен для автоматической сборки и тестирования на GitHub Actions:
-
-- Сборка с GCC и Clang
-- Тестирование с Valgrind для проверки утечек памяти
-- Бенчмарки производительности
-- Поддержка OpenMP
-
-## Структура проекта
-
-```
-├── main.cpp              # Основная программа
-├── WorkWithBMP.h         # Заголовочный файл класса BMPImage
-├── WorkWithBMP.cpp       # Реализация класса BMPImage
-├── Makefile              # Сборка с Make
-├── CMakeLists.txt        # Сборка с CMake
-├── .github/workflows/    # CI/CD конфигурация
-└── README.md             # Документация
+# Advanced scalability benchmark
+./bmp_processor_optimized --advanced
 ```
 
-## Производительность
+## Testing
 
-Распараллеливание особенно эффективно для:
-- Больших изображений (высокое разрешение)
-- Многоядерных процессоров
-- Операций поворота и фильтрации
+### Memory Check
+```bash
+make memcheck
+```
 
-Используйте `--benchmark` для измерения производительности на вашей системе.
-
-## Автор
-
-Gleb Shikunov  
-st128274@student.spbu.ru
